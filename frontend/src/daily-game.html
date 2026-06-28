@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>بازی روزانه</title>
+  <style>
+    body {
+      font-family: Tahoma, Arial, sans-serif;
+      background: #f5f7fb;
+      margin: 0;
+      padding: 32px;
+    }
+
+    .card {
+      max-width: 700px;
+      margin: 0 auto;
+      background: white;
+      padding: 24px;
+      border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    }
+
+    button {
+      display: block;
+      width: 100%;
+      margin-top: 12px;
+      padding: 12px;
+      border: 0;
+      border-radius: 10px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .option {
+      background: #e5e7eb;
+    }
+
+    .primary {
+      background: #2563eb;
+      color: white;
+    }
+
+    .score-box {
+      background: #ecfdf5;
+      border: 1px solid #bbf7d0;
+      color: #166534;
+      padding: 12px;
+      border-radius: 10px;
+      margin-bottom: 16px;
+    }
+
+    .result {
+      margin-top: 16px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>بازی روزانه</h1>
+    <div id="content">در حال دریافت مرحله امروز...</div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      window.location.href = "/login.html";
+    }
+
+    let sessionId = null;
+    let questions = [];
+    let currentIndex = 0;
+    let sessionScore = 0;
+    let totalScore = 0;
+    let correctCount = 0;
+    let wrongCount = 0;
+
+    async function loadStage() {
+      const res = await fetch("/api/game/start", {
+        method: "POST",
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      });
+
+      if (!res.ok) {
+        document.getElementById("content").textContent = "مرحله امروز پیدا نشد.";
+        return;
+      }
+
+      const data = await res.json();
+
+      sessionId = data.session.id;
+      questions = data.questions;
+      sessionScore = data.session.score;
+      totalScore = data.user.total_score;
+
+      renderQuestion();
+    }
+
+    function renderQuestion() {
+      const question = questions[currentIndex];
+
+      if (!question) {
+        finishStage();
+        return;
+      }
+
+      const content = document.getElementById("content");
+
+      content.innerHTML = `
+        <div class="score-box">
+          امتیاز این مرحله: ${sessionScore}
+          <br />
+          امتیاز کل شما: ${totalScore}
+        </div>
+
+        <p>سوال ${currentIndex + 1} از ${questions.length}</p>
+        <h2>${question.title}</h2>
+
+        <div id="options"></div>
+        <div id="feedback" class="result"></div>
+      `;
+
+      const optionsContainer = document.getElementById("options");
+
+      question.options.forEach(option => {
+        const button = document.createElement("button");
+        button.className = "option";
+        button.textContent = option.text;
+        button.onclick = () => submitAnswer(question.id, option.text);
+        optionsContainer.appendChild(button);
+      });
+    }
+
+    async function submitAnswer(questionId, answer) {
+      const buttons = document.querySelectorAll("button");
+      buttons.forEach(btn => btn.disabled = true);
+
+      const res = await fetch("/api/game/submit-answer", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({
+          session_id: sessionId,
+          question_id: questionId,
+          answer: answer
+        })
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        document.getElementById("feedback").textContent = data.detail || "خطا در ثبت پاسخ.";
+        return;
+      }
+
+      sessionScore = data.session_score;
+      totalScore = data.user_total_score;
+
+      if (data.is_correct) {
+        correctCount++;
+        document.getElementById("feedback").textContent =
+          `پاسخ صحیح است. ${data.score_earned} امتیاز دریافت کردید.`;
+      } else {
+        wrongCount++;
+        document.getElementById("feedback").textContent =
+          "پاسخ نادرست است. " + data.explanation;
+      }
+
+      setTimeout(() => {
+        currentIndex++;
+        renderQuestion();
+      }, 1200);
+    }
+
+    async function finishStage() {
+      const res = await fetch("/api/game/finish", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": "Bearer " + token
+        },
+        body: JSON.stringify({
+          session_id: sessionId
+        })
+      });
+
+      const data = await res.json();
+
+      document.getElementById("content").innerHTML = `
+        <h2>مرحله امروز تمام شد</h2>
+        <p>امتیاز این مرحله: ${data.score}</p>
+        <p>امتیاز کل شما: ${data.user_total_score}</p>
+        <p>تعداد پاسخ صحیح: ${data.correct_count}</p>
+        <p>تعداد پاسخ غلط: ${data.wrong_count}</p>
+        <button class="primary" onclick="window.location.href='/game-home.html'">
+          بازگشت به صفحه اصلی
+        </button>
+      `;
+    }
+
+    loadStage();
+  </script>
+</body>
+</html>

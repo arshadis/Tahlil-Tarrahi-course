@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f172a" />
+  <link rel="manifest" href="/manifest.webmanifest" />
+  <meta charset="UTF-8" />
+  <title>ورود به بازی آموزشی</title>
+  <style>
+    body {
+      font-family: Tahoma, Arial, sans-serif;
+      background: #f5f7fb;
+      display: flex;
+      min-height: 100vh;
+      align-items: center;
+      justify-content: center;
+    }
+    .card {
+      width: 360px;
+      background: white;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    }
+    label {
+      display: block;
+      margin-top: 14px;
+      font-weight: 600;
+    }
+    input {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      margin-top: 6px;
+      border: 1px solid #ccd3df;
+      border-radius: 8px;
+    }
+    button {
+      width: 100%;
+      margin-top: 18px;
+      padding: 12px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+    }
+    .error {
+      margin-top: 14px;
+      color: #b42318;
+      min-height: 24px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h2>ورود به سیستم</h2>
+
+    <label>نام کاربری</label>
+    <input id="username" type="text" autocomplete="username" />
+
+    <label>رمز عبور</label>
+    <input id="password" type="password" autocomplete="current-password" />
+
+    <button onclick="login()">ورود</button>
+    <div id="error" class="error"></div>
+  </div>
+
+  <script>
+    async function login() {
+      const error = document.getElementById("error");
+      error.textContent = "";
+
+      const username = document.getElementById("username").value.trim();
+      const password = document.getElementById("password").value;
+
+      if (!username || !password) {
+        error.textContent = "نام کاربری و رمز عبور الزامی است.";
+        return;
+      }
+
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: {"Content-Type": "application/json"},
+        body: JSON.stringify({username, password})
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        error.textContent = data.detail || "نام کاربری یا رمز عبور اشتباه است.";
+        return;
+      }
+
+      localStorage.setItem("access_token", data.access_token);
+      window.location.href = "./game-home.html";
+    }
+
+    if ("serviceWorker" in navigator) {
+      navigator.serviceWorker.register("/service-worker.js");
+    }
+</script>
+</body>
+</html>

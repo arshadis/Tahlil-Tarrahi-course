@@ -1,0 +1,11 @@
+{
+  "name": "Daily Learning Game",
+  "short_name": "Learning Game",
+  "description": "بازی آموزشی روزانه تحت وب",
+  "start_url": "/login.html",
+  "display": "standalone",
+  "background_color": "#f5f7fb",
+  "theme_color": "#0f172a",
+  "dir": "rtl",
+  "lang": "fa"
+}
