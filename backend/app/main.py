@@ -1,6 +1,7 @@
 from contextlib import asynccontextmanager
 import os
-
+from fastapi.staticfiles import StaticFiles
+from app.routes.admin_questions import router as admin_questions_router
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -34,6 +35,10 @@ app.add_middleware(
 
 app.include_router(auth_router)
 app.include_router(game_router)
+app.include_router(admin_questions_router)
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 
 @app.get("/")
 def health_check():

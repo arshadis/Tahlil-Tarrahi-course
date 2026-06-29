@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <title>مدیریت سوالات</title>
+
+  <style>
+    body {
+      font-family: Tahoma, Arial, sans-serif;
+      background: #f5f7fb;
+      padding: 32px;
+    }
+
+    .card {
+      max-width: 1000px;
+      margin: 0 auto;
+      background: white;
+      padding: 24px;
+      border-radius: 14px;
+      box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    }
+
+    input, select, textarea {
+      width: 100%;
+      box-sizing: border-box;
+      padding: 10px;
+      margin-top: 6px;
+      border-radius: 8px;
+      border: 1px solid #cbd5e1;
+      font-size: 15px;
+    }
+
+    label {
+      display: block;
+      margin-top: 12px;
+      font-weight: bold;
+    }
+
+    button {
+      padding: 10px 14px;
+      border: 0;
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: bold;
+      margin-top: 8px;
+    }
+
+    .primary {
+      background: #2563eb;
+      color: white;
+    }
+
+    .danger {
+      background: #dc2626;
+      color: white;
+    }
+
+    .secondary {
+      background: #e5e7eb;
+      color: #111827;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+
+    th, td {
+      padding: 10px;
+      border-bottom: 1px solid #e5e7eb;
+      text-align: right;
+      vertical-align: top;
+    }
+
+    .form-box {
+      margin-top: 24px;
+      padding: 16px;
+      border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #f9fafb;
+      display: none;
+    }
+
+    .message {
+      margin-top: 12px;
+      font-weight: bold;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="card">
+    <h1>مدیریت سوالات</h1>
+
+    <button class="secondary" onclick="window.location.href='/game-home.html'">
+      بازگشت به صفحه اصلی
+    </button>
+
+    <label>جستجو در متن سوال</label>
+    <input id="search" placeholder="مثلاً رمز عبور، فیشینگ، ایمیل..." />
+
+    <label>سطح سختی</label>
+    <select id="difficulty">
+      <option value="">همه</option>
+      <option value="easy">آسان</option>
+      <option value="medium">متوسط</option>
+      <option value="hard">دشوار</option>
+    </select>
+
+    <button class="primary" onclick="loadQuestions()">جستجو</button>
+
+    <table>
+      <thead>
+        <tr>
+          <th>شناسه</th>
+          <th>متن سوال</th>
+          <th>نوع</th>
+          <th>موضوع</th>
+          <th>سطح</th>
+          <th>عملیات</th>
+        </tr>
+      </thead>
+      <tbody id="questionsTable"></tbody>
+    </table>
+
+    <div id="editForm" class="form-box">
+      <h2>ویرایش سوال</h2>
+
+      <input id="editId" type="hidden" />
+
+      <label>متن سوال</label>
+      <textarea id="editTitle"></textarea>
+
+      <label>نوع سوال</label>
+      <select id="editQuestionType">
+        <option value="multiple_choice">چهارگزینه‌ای</option>
+        <option value="fill_blank">جای خالی</option>
+        <option value="image">تصویری</option>
+      </select>
+
+      <label>موضوع آموزشی</label>
+      <input id="editTopic" />
+
+      <label>سطح سختی</label>
+      <select id="editDifficulty">
+        <option value="easy">آسان</option>
+        <option value="medium">متوسط</option>
+        <option value="hard">دشوار</option>
+      </select>
+
+      <label>گزینه‌ها</label>
+      <input id="editOption1" placeholder="گزینه ۱" />
+      <input id="editOption2" placeholder="گزینه ۲" />
+      <input id="editOption3" placeholder="گزینه ۳" />
+      <input id="editOption4" placeholder="گزینه ۴ اختیاری" />
+
+      <label>پاسخ صحیح</label>
+      <input id="editCorrectAnswer" />
+
+      <label>توضیح پاسخ اشتباه</label>
+      <textarea id="editExplanation"></textarea>
+
+      <label>تصویر جدید، در صورت نیاز</label>
+      <input id="editImage" type="file" accept="image/*" />
+
+      <button class="primary" onclick="submitEdit()">ذخیره ویرایش</button>
+      <button class="secondary" onclick="hideEditForm()">انصراف</button>
+
+      <div id="message" class="message"></div>
+    </div>
+  </div>
+
+  <script>
+    const token = localStorage.getItem("access_token");
+
+    if (!token) {
+      sessionStorage.setItem("post_login_redirect", "/admin-questions.html");
+      window.location.href = "/login.html?redirect=/admin-questions.html";
+    }
+
+    async function loadQuestions() {
+      const search = document.getElementById("search").value.trim();
+      const difficulty = document.getElementById("difficulty").value;
+
+      const params = new URLSearchParams();
+      if (search) params.append("search", search);
+      if (difficulty) params.append("difficulty", difficulty);
+
+      const res = await fetch("/api/admin/questions?" + params.toString(), {
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.detail || "خطا در دریافت سوالات.");
+        return;
+      }
+
+      const tbody = document.getElementById("questionsTable");
+      tbody.innerHTML = "";
+
+      data.questions.forEach(question => {
+        const row = document.createElement("tr");
+
+        row.innerHTML = `
+          <td>${question.id}</td>
+          <td>${question.title}</td>
+          <td>${question.question_type}</td>
+          <td>${question.topic}</td>
+          <td>${question.difficulty}</td>
+          <td>
+            <button class="primary" onclick="openEdit(${question.id})">ویرایش</button>
+            <button class="danger" onclick="deleteQuestion(${question.id})">حذف</button>
+          </td>
+        `;
+
+        tbody.appendChild(row);
+      });
+    }
+
+    async function openEdit(questionId) {
+      const res = await fetch("/api/admin/questions/" + questionId, {
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      });
+
+      const question = await res.json();
+
+      if (!res.ok) {
+        alert(question.detail || "خطا در دریافت سوال.");
+        return;
+      }
+
+      document.getElementById("editForm").style.display = "block";
+      document.getElementById("editId").value = question.id;
+      document.getElementById("editTitle").value = question.title;
+      document.getElementById("editQuestionType").value = question.question_type;
+      document.getElementById("editTopic").value = question.topic;
+      document.getElementById("editDifficulty").value = question.difficulty;
+      document.getElementById("editCorrectAnswer").value = question.correct_answer;
+      document.getElementById("editExplanation").value = question.explanation || "";
+
+      const options = question.options || [];
+
+      document.getElementById("editOption1").value = options[0]?.text || "";
+      document.getElementById("editOption2").value = options[1]?.text || "";
+      document.getElementById("editOption3").value = options[2]?.text || "";
+      document.getElementById("editOption4").value = options[3]?.text || "";
+
+      window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
+    }
+
+    async function submitEdit() {
+      const questionId = document.getElementById("editId").value;
+
+      const options = [
+        document.getElementById("editOption1").value.trim(),
+        document.getElementById("editOption2").value.trim(),
+        document.getElementById("editOption3").value.trim(),
+        document.getElementById("editOption4").value.trim(),
+      ].filter(Boolean);
+
+      const formData = new FormData();
+      formData.append("title", document.getElementById("editTitle").value.trim());
+      formData.append("question_type", document.getElementById("editQuestionType").value);
+      formData.append("difficulty", document.getElementById("editDifficulty").value);
+      formData.append("topic", document.getElementById("editTopic").value.trim());
+      formData.append("correct_answer", document.getElementById("editCorrectAnswer").value.trim());
+      formData.append("explanation", document.getElementById("editExplanation").value.trim());
+      formData.append("options_json", JSON.stringify(options));
+
+      const image = document.getElementById("editImage").files[0];
+      if (image) {
+        formData.append("image", image);
+      }
+
+      const res = await fetch("/api/admin/questions/" + questionId, {
+        method: "PUT",
+        headers: {
+          "Authorization": "Bearer " + token
+        },
+        body: formData
+      });
+
+      const data = await res.json();
+      const message = document.getElementById("message");
+
+      if (!res.ok) {
+        message.style.color = "#991b1b";
+        message.textContent = data.detail || "خطا در ویرایش سوال.";
+        return;
+      }
+
+      message.style.color = "#166534";
+      message.textContent = "سوال با موفقیت ویرایش شد.";
+
+      await loadQuestions();
+
+      setTimeout(() => {
+        hideEditForm();
+      }, 1000);
+    }
+
+    async function deleteQuestion(questionId) {
+      const confirmed = confirm("آیا از حذف این سوال مطمئن هستید؟");
+
+      if (!confirmed) {
+        return;
+      }
+
+      const res = await fetch("/api/admin/questions/" + questionId, {
+        method: "DELETE",
+        headers: {
+          "Authorization": "Bearer " + token
+        }
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        alert(data.detail || "خطا در حذف سوال.");
+        return;
+      }
+
+      alert("سوال با موفقیت حذف شد.");
+      await loadQuestions();
+    }
+
+    function hideEditForm() {
+      document.getElementById("editForm").style.display = "none";
+      document.getElementById("message").textContent = "";
+    }
+
+    loadQuestions();
+  </script>
+</body>
+</html>

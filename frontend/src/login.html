@@ -92,7 +92,16 @@
       }
 
       localStorage.setItem("access_token", data.access_token);
-      window.location.href = "./game-home.html";
+
+      const params = new URLSearchParams(window.location.search);
+      const redirectTo =
+        params.get("redirect") ||
+        sessionStorage.getItem("post_login_redirect") ||
+        "/game-home.html";
+
+      sessionStorage.removeItem("post_login_redirect");
+
+      window.location.href = redirectTo;
     }
 
     if ("serviceWorker" in navigator) {
